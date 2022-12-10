@@ -15,7 +15,7 @@ import traceback
 import urllib.parse
 
 import requests
-from PIL import Image, ImageFile
+import PIL.Image as Image, PIL.ImageFile as ImageFile
 
 from . import urls
 

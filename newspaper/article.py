@@ -102,6 +102,12 @@ class Article(object):
 
         self.publish_date = ''
 
+        self.articles = []
+
+        self.categories = []
+
+        self.paywall = False
+
         # Summary generated from the article's body txt
         self.summary = ''
 
@@ -229,7 +235,7 @@ class Article(object):
         title = self.extractor.get_title(self.clean_doc)
         self.set_title(title)
 
-        authors = self.extractor.get_authors(self.clean_doc)
+        authors = self.extractor.get_authors(self.clean_doc, self.url)
         self.set_authors(authors)
 
         meta_lang = self.extractor.get_meta_lang(self.clean_doc)
@@ -266,6 +272,13 @@ class Article(object):
         self.publish_date = self.extractor.get_publishing_date(
             self.url,
             self.clean_doc)
+
+        self.category = self.extractor.get_category(self.url)
+
+        self.paywall = self.extractor.is_paywall(self.url)
+
+        self.articles = self.extractor.getArticles(self.url)
+
 
         # Before any computations on the body, clean DOM object
         self.doc = document_cleaner.clean(self.doc)

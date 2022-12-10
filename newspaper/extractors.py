@@ -21,6 +21,9 @@ from dateutil.parser import parse as date_parser
 from tldextract import tldextract
 from urllib.parse import urljoin, urlparse, urlunparse
 
+from bs4 import BeautifulSoup
+import requests
+
 from . import urls
 from .utils import StringReplacement, StringSplitter
 
@@ -48,8 +51,8 @@ good_paths = ['story', 'article', 'feature', 'featured', 'slides',
               'v', 'radio', 'press']
 bad_chunks = ['careers', 'contact', 'about', 'faq', 'terms', 'privacy',
               'advert', 'preferences', 'feedback', 'info', 'browse', 'howto',
-              'account', 'subscribe', 'donate', 'shop', 'admin']
-bad_domains = ['amazon', 'doubleclick', 'twitter']
+              'account', 'subscribe', 'donate', 'shop', 'admin', 'ad']
+bad_domains = ['amazon', 'doubleclick', 'twitter', 'instagram']
 
 
 class ContentExtractor(object):
@@ -69,7 +72,28 @@ class ContentExtractor(object):
             self.stopwords_class = \
                 self.config.get_stopwords_class(meta_lang)
 
-    def get_authors(self, doc):
+    def is_paywall(self, url):
+
+        page = requests.get(url)
+        soup2 = BeautifulSoup(page.content,'html.parser')
+
+        """BILD"""
+        htmlAuthor = soup2.find("div", {"class": "offer-module"})
+        print(htmlAuthor)
+        if htmlAuthor != None:
+            return "Plus"
+        else:
+            return "No Plus"
+
+        """DIE ZEIT & SZ
+        htmlAuthor = soup2.find("meta", {"content": "locked"})
+        print(htmlAuthor)
+        if htmlAuthor != None:
+            return "Plus"
+        else:
+            return "No Plus"  """
+
+    def get_authors(self, doc, url):
         """Fetch the authors of the article, return as a list
         Only works for english articles
         """
@@ -136,15 +160,24 @@ class ContentExtractor(object):
         # Try 1: Search popular author tags for authors
 
         ATTRS = ['name', 'rel', 'itemprop', 'class', 'id']
-        VALS = ['author', 'byline', 'dc.creator', 'byl']
+        VALS = ['author', 'dc.creator', 'byl']
         matches = []
+        soupMatches = []
         authors = []
+
+        page = requests.get(url)
+        soup2 = BeautifulSoup(page.content,'html.parser')
+        htmlAuthor = soup2.findAll("a", {"rel": "author"})
+        for author in htmlAuthor:
+            res = author.findChild()
+            soupMatches.extend(res)
 
         for attr in ATTRS:
             for val in VALS:
                 # found = doc.xpath('//*[@%s="%s"]' % (attr, val))
                 found = self.parser.getElementsByTag(doc, attr=attr, value=val)
                 matches.extend(found)
+                
 
         for match in matches:
             content = ''
@@ -156,8 +189,9 @@ class ContentExtractor(object):
                 content = match.text_content() or ''
             if len(content) > 0:
                 authors.extend(parse_byline(content))
+                return uniqify_list(authors)
 
-        return uniqify_list(authors)
+        return soupMatches
 
         # TODO Method 2: Search raw html for a by-line
         # match = re.search('By[\: ].*\\n|From[\: ].*\\n', html)
@@ -195,6 +229,7 @@ class ContentExtractor(object):
             if datetime_obj:
                 return datetime_obj
 
+
         PUBLISH_DATE_TAGS = [
             {'attribute': 'property', 'value': 'rnews:datePublished',
              'content': 'content'},
@@ -218,6 +253,12 @@ class ContentExtractor(object):
              'content': 'datetime'},
             {'attribute': 'name', 'value': 'publish_date',
              'content': 'content'},
+            {'attribute': 'class', 'value': 'date',
+            'content': 'content'},
+            {'attribute': 'datetime', 'value': 'value',
+            'content': 'content'},
+            {'attribute': 'class', 'value': 'date',
+            'content': 'content'},
         ]
         for known_meta_tag in PUBLISH_DATE_TAGS:
             meta_tags = self.parser.getElementsByTag(
@@ -231,8 +272,16 @@ class ContentExtractor(object):
                 datetime_obj = parse_date_str(date_str)
                 if datetime_obj:
                     return datetime_obj
+            else:
+                page = requests.get(url)
+                soup2 = BeautifulSoup(page.content,'html.parser')
+                """print(parse_date_str(soup2.find('time')['datetime']))
+                dates = soup2.find('time')['datetime']
+                if dates != None:
+                    return dates"""
 
-        return None
+        return "None"
+        
 
     def get_title(self, doc):
         """Fetch the article title and analyze it
@@ -447,7 +496,7 @@ class ContentExtractor(object):
     def get_meta_img_url(self, article_url, doc):
         """Returns the 'top img' as specified by the website
         """
-        top_meta_image, try_one, try_two, try_three, try_four = [None] * 5
+        top_meta_image, try_one, try_two, try_three, try_four, try_five = [None] * 6
         try_one = self.get_meta_content(doc, 'meta[property="og:image"]')
         if not try_one:
             link_img_src_kwargs = \
@@ -459,11 +508,16 @@ class ContentExtractor(object):
                 try_three = self.get_meta_content(doc, 'meta[name="og:image"]')
 
                 if not try_three:
-                    link_icon_kwargs = {'tag': 'link', 'attr': 'rel', 'value': 'icon'}
+                    link_icon_kwargs = {'tag': 'link', 'attr': 'property', 'value': 'og:image'}
                     elems = self.parser.getElementsByTag(doc, **link_icon_kwargs)
                     try_four = elems[0].get('href') if elems else None
 
-        top_meta_image = try_one or try_two or try_three or try_four
+                    if not try_four:
+                        link_icon_kwargs = {'tag': 'link', 'attr': 'rel', 'value': 'icon'}
+                        elems = self.parser.getElementsByTag(doc, **link_icon_kwargs)
+                        try_five = elems[0].get('href') if elems else None
+
+        top_meta_image = try_one or try_two or try_three or try_four or try_five
 
         if top_meta_image:
             return urljoin(article_url, top_meta_image)
@@ -1051,3 +1105,48 @@ class ContentExtractor(object):
                 if self.is_highlink_density(e):
                     self.parser.remove(e)
         return node
+
+    def get_category(self, url):
+
+        soupMatches = []
+
+        page = requests.get(url)
+        soup2 = BeautifulSoup(page.content,'html.parser')
+
+        """ZEIT ONLINE
+        
+        
+        categories = soup2.find("picture").findChildren()
+        for category in categories:
+            soupMatches.extend(category)"""
+
+        return soupMatches
+
+    def getArticles(self,url):
+        soupMatches = []
+
+        page = requests.get(url)
+        soup2 = BeautifulSoup(page.content,'html.parser')
+
+        """BILD ZEITUNG
+
+        articles = soup2.findAll("p")
+        for article in articles:
+            articleLink = article.find('a')
+            if articleLink != None:
+                articleHREF = articleLink.get("href")
+                print(articleHREF)
+                soupMatches.extend(articleHREF)"""
+        
+        """SZ """
+        """articles = soup2.findAll("div", {"class": "entrylist__content"})
+        for article in articles:
+            articleLink = article.find('a')
+            articleHREF = articleLink.get("href")
+            print(articleHREF)
+            soupMatches.extend(articleHREF)
+
+        for a in soup2.findAll("a", {"class": "entrylist__link"}, href=True):
+            soupMatches.extend(a[href])"""
+
+        return soupMatches
