@@ -15,6 +15,7 @@ import copy
 import logging
 import re
 import re
+import sys
 from collections import defaultdict
 
 from dateutil.parser import parse as date_parser
@@ -77,21 +78,32 @@ class ContentExtractor(object):
         page = requests.get(url)
         soup2 = BeautifulSoup(page.content,'html.parser')
 
-        """BILD"""
+        """BILD
         htmlAuthor = soup2.find("div", {"class": "offer-module"})
         print(htmlAuthor)
         if htmlAuthor != None:
             return "Plus"
         else:
             return "No Plus"
+            """
 
-        """DIE ZEIT & SZ
-        htmlAuthor = soup2.find("meta", {"content": "locked"})
-        print(htmlAuthor)
+        """Spiegel
+        htmlAuthor = soup2.find("div", {"data-area": "paywall"})
         if htmlAuthor != None:
             return "Plus"
         else:
-            return "No Plus"  """
+            return "No Plus" """
+            
+
+        """DIE ZEIT & SZ """
+        locked = soup2.find("meta", {"content": "locked"})
+        registered = soup2.find("meta", {"content": "registration"})
+        if locked != None:
+            return "Plus"
+        elif registered != None:
+             return "Registered"
+        else:
+            return "No Plus" 
 
     def get_authors(self, doc, url):
         """Fetch the authors of the article, return as a list
@@ -227,6 +239,9 @@ class ContentExtractor(object):
             date_str = date_match.group(0)
             datetime_obj = parse_date_str(date_str)
             if datetime_obj:
+                # fp = open(r"C:\\Users\\kaysi\\Desktop\\sample2.txt", "a+")
+                # fp.write(str(datetime_obj))
+                # fp.close()
                 return datetime_obj
 
 
@@ -271,15 +286,19 @@ class ContentExtractor(object):
                     known_meta_tag['content'])
                 datetime_obj = parse_date_str(date_str)
                 if datetime_obj:
-                    return datetime_obj
+                    # fp = open(r"C:\\Users\\kaysi\\Desktop\\sample2.txt", "a+")
+                    # fp.write(datetime_obj)
+                    # fp.close()
+                    res = datetime_obj.split('T')
+                    return res[0]
             else:
                 page = requests.get(url)
                 soup2 = BeautifulSoup(page.content,'html.parser')
-                """print(parse_date_str(soup2.find('time')['datetime']))
+                print(parse_date_str(soup2.find('time')['datetime']))
                 dates = soup2.find('time')['datetime']
                 if dates != None:
-                    return dates"""
-
+                    res = dates.split('T')    #T bei Zeit ' ' bei Spiegel
+                    return res[0]
         return "None"
         
 
@@ -1112,8 +1131,10 @@ class ContentExtractor(object):
 
         page = requests.get(url)
         soup2 = BeautifulSoup(page.content,'html.parser')
+        """res = url.split('/')
+        return res[3]
 
-        """ZEIT ONLINE
+        ZEIT ONLINE
         
         
         categories = soup2.find("picture").findChildren()
