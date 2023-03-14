@@ -78,24 +78,15 @@ class ContentExtractor(object):
         page = requests.get(url)
         soup2 = BeautifulSoup(page.content,'html.parser')
 
-        """BILD
-        htmlAuthor = soup2.find("div", {"class": "offer-module"})
-        print(htmlAuthor)
-        if htmlAuthor != None:
-            return "Plus"
-        else:
-            return "No Plus"
-            """
-
         """Spiegel
-        htmlAuthor = soup2.find("div", {"data-area": "paywall"})
-        if htmlAuthor != None:
+        paywall = soup2.find("div", {"data-area": "paywall"})
+        if paywall != None:
             return "Plus"
         else:
-            return "No Plus" """
+            return "No Plus"  """
             
 
-        """DIE ZEIT & SZ """
+        """ DIE ZEIT & SZ  """
         locked = soup2.find("meta", {"content": "locked"})
         registered = soup2.find("meta", {"content": "registration"})
         if locked != None:
@@ -103,7 +94,16 @@ class ContentExtractor(object):
         elif registered != None:
              return "Registered"
         else:
-            return "No Plus" 
+            return "No Plus"
+        
+        """BILD
+        paywall = soup2.find("div", {"class": "offer-module"})
+        print(paywall)
+        if paywall != None:
+            return "Plus"
+        else:
+            return "No Plus"
+            """
 
     def get_authors(self, doc, url):
         """Fetch the authors of the article, return as a list
@@ -552,15 +552,23 @@ class ContentExtractor(object):
         """
         return self.get_meta_content(doc, 'meta[property="og:site_name"]')
 
-    def get_meta_description(self, doc):
+    def get_meta_description(self, doc, url):
         """If the article has meta description set in the source, use that
-        """
-        return self.get_meta_content(doc, "meta[name=description]")
+        
+        return str(self.get_meta_content(doc, "meta[name=description]").encode('utf-8')) """
+        page = requests.get(url)
+        soup2 = BeautifulSoup(page.content,'html.parser')
+        dates = soup2.find("meta", {"name": "description"})
+        return str(dates.encode('utf-8'))
 
-    def get_meta_keywords(self, doc):
+    def get_meta_keywords(self, doc, url):
         """If the article has meta keywords set in the source, use that
         """
-        return self.get_meta_content(doc, "meta[name=keywords]")
+        """ return str(self.get_meta_content(doc, "meta[name=keywords]").encode('utf-8'))"""
+        page = requests.get(url)
+        soup2 = BeautifulSoup(page.content,'html.parser')
+        dates = soup2.find("meta", {"name": "keywords"})
+        return str(dates.encode('utf-8'))
 
     def get_meta_data(self, doc):
         data = defaultdict(dict)
@@ -1131,10 +1139,10 @@ class ContentExtractor(object):
 
         page = requests.get(url)
         soup2 = BeautifulSoup(page.content,'html.parser')
-        """res = url.split('/')
+        res = url.split('/')
         return res[3]
 
-        ZEIT ONLINE
+        """ZEIT ONLINE
         
         
         categories = soup2.find("picture").findChildren()

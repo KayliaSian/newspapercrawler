@@ -252,7 +252,7 @@ class Article(object):
         self.set_meta_site_name(meta_site_name)
 
         meta_description = \
-            self.extractor.get_meta_description(self.clean_doc)
+            self.extractor.get_meta_description(self.clean_doc, self.url)
         self.set_meta_description(meta_description)
 
         canonical_link = self.extractor.get_canonical_link(
@@ -263,7 +263,7 @@ class Article(object):
         self.set_tags(tags)
 
         meta_keywords = self.extractor.get_meta_keywords(
-            self.clean_doc)
+            self.clean_doc, self.url)
         self.set_meta_keywords(meta_keywords)
 
         meta_data = self.extractor.get_meta_data(self.clean_doc)
